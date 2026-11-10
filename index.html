@@ -1,0 +1,475 @@
+<title>Shin's Lot Calculator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=JetBrains+Mono:wght@400;600&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow trading-ticket column — inputs on top, the lot size result as the one loud block, the symbol preset underneath. */
+:root {
+  --bg: #f3f5f4;
+  --panel: #ffffff;
+  --line: #d6ddda;
+  --fg: #16201d;
+  --muted: #5b6a65;
+  --accent: #0f6e5a;
+  --accent-ink: #ffffff;
+  --result-bg: #0f2a24;
+  --result-fg: #e9f5f1;
+  --result-muted: #9fc0b6;
+  --warn: #9a5b00;
+  --warn-bg: #fff3dd;
+  --buy: #0f7a4c;
+  --sell: #b23a2a;
+  --focus: #2b7fff;
+  --idle-bg: #dfe4e2;
+  --idle-fg: #4a5753;
+  --go-bg: #138a55;
+  --go-fg: #ffffff;
+  --tick-bg: #e3f3ec;
+  --f-display: "Archivo", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --f-num: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1412; --panel: #161e1b; --line: #2a3632; --fg: #e4ece9; --muted: #93a49e;
+    --accent: #3cc29f; --accent-ink: #06231b; --result-bg: #0b3a30; --result-fg: #effaf6; --result-muted: #9cc9bb;
+    --warn: #f0b45a; --warn-bg: #2e2412; --buy: #4fd08f; --sell: #ff8a78; --focus: #7fb2ff;
+    --idle-bg: #26302d; --idle-fg: #a9b8b3; --go-bg: #1fae6c; --go-fg: #04170e; --tick-bg: #12332a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1412; --panel: #161e1b; --line: #2a3632; --fg: #e4ece9; --muted: #93a49e;
+  --accent: #3cc29f; --accent-ink: #06231b; --result-bg: #0b3a30; --result-fg: #effaf6; --result-muted: #9cc9bb;
+  --warn: #f0b45a; --warn-bg: #2e2412; --buy: #4fd08f; --sell: #ff8a78; --focus: #7fb2ff;
+  --idle-bg: #26302d; --idle-fg: #a9b8b3; --go-bg: #1fae6c; --go-fg: #04170e; --tick-bg: #12332a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--f-body); font-size: 16px; line-height: 1.45;
+  padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 560px; margin: 0 auto; display: grid; gap: 16px; }
+header h1 { font-family: var(--f-display); font-weight: 700; font-size: 1.6rem; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+header p { margin: 4px 0 0; color: var(--muted); font-size: 0.95rem; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 14px; }
+.panel h2 { font-family: var(--f-display); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 420px) { .row { grid-template-columns: 1fr; } }
+.field { display: grid; gap: 4px; min-width: 0; align-content: start; }
+label { font-size: 0.9rem; font-weight: 600; }
+.hint { font-size: 0.8rem; color: var(--muted); }
+input, select {
+  font: 500 1.05rem/1.2 var(--f-num); color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 10px 10px; width: 100%; min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+select { font-family: var(--f-display); font-weight: 600; }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; width: fit-content; }
+.seg button { font: 600 0.9rem var(--f-body); padding: 8px 14px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.calc-out { font: 600 1.05rem var(--f-num); padding: 10px 0; overflow-wrap: anywhere; }
+
+.result { background: var(--result-bg); color: var(--result-fg); border-radius: 10px; padding: 18px 16px; display: grid; gap: 14px; }
+.result .label { font-family: var(--f-display); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--result-muted); }
+.lot { font: 600 clamp(2.4rem, 11vw, 3.4rem)/1 var(--f-num); font-variant-numeric: tabular-nums; }
+.lot small { font-size: 0.4em; color: var(--result-muted); margin-left: 6px; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+.stat { display: grid; gap: 2px; min-width: 0; }
+.stat .v { font: 600 1.05rem var(--f-num); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pill { display: inline-block; font: 700 0.75rem var(--f-display); letter-spacing: 0.08em; padding: 3px 8px; border-radius: 99px; background: var(--result-fg); }
+.pill.buy { color: var(--buy); } .pill.sell { color: var(--sell); }
+.note { background: var(--warn-bg); color: var(--warn); border-radius: 6px; padding: 10px 12px; font-size: 0.92rem; margin: 0; }
+
+.preset-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.saved { font-size: 0.8rem; color: var(--muted); }
+.btn { font: 600 0.9rem var(--f-body); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; }
+.btn.danger { border-color: var(--sell); color: var(--sell); }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+footer { color: var(--muted); font-size: 0.82rem; }
+
+.check-list { display: grid; gap: 8px; }
+.check {
+  display: grid; grid-template-columns: 32px 1fr; gap: 12px; align-items: center;
+  width: 100%; min-height: 60px; padding: 12px 14px; text-align: left;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg);
+  font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.check .box {
+  width: 32px; height: 32px; border-radius: 6px; border: 2px solid var(--muted);
+  display: grid; place-items: center; font: 700 1.2rem var(--f-body); color: transparent;
+}
+.check[aria-pressed="true"] { background: var(--tick-bg); border-color: var(--go-bg); }
+.check[aria-pressed="true"] .box { background: var(--go-bg); border-color: var(--go-bg); color: var(--go-fg); }
+.check .code { font: 600 0.95rem var(--f-num); display: block; }
+.check .desc { font-size: 0.9rem; color: var(--muted); display: block; }
+.check.auto { cursor: default; }
+.status {
+  border-radius: 8px; padding: 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  background: var(--idle-bg); color: var(--idle-fg);
+  font: 700 clamp(1.4rem, 7vw, 1.9rem)/1 var(--f-display); letter-spacing: 0.04em;
+}
+.status .count { font: 600 1.1rem var(--f-num); }
+.status.go { background: var(--go-bg); color: var(--go-fg); }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Shin's Lot Calculator</h1>
+    <p>Pick the symbol, type entry and stop-loss. All money is in USD.</p>
+  </header>
+
+  <section class="panel" aria-labelledby="h-acct">
+    <h2 id="h-acct">Account (USD)</h2>
+    <div class="field">
+      <span class="hint">Risk by</span>
+      <div class="seg" role="group" aria-label="Risk by">
+        <button type="button" id="mode-pct" aria-pressed="true">% of balance</button>
+        <button type="button" id="mode-amt" aria-pressed="false">Fixed USD</button>
+      </div>
+    </div>
+    <div class="row" id="pct-wrap">
+      <div class="field">
+        <label for="balance">Balance (USD)</label>
+        <input id="balance" inputmode="decimal" autocomplete="off" placeholder="e.g. 10000">
+      </div>
+      <div class="field">
+        <label for="riskPct">Risk %</label>
+        <input id="riskPct" inputmode="decimal" autocomplete="off" placeholder="e.g. 1">
+      </div>
+    </div>
+    <div class="field" id="amt-wrap" hidden>
+      <label for="riskAmt">Risk (USD)</label>
+      <input id="riskAmt" inputmode="decimal" autocomplete="off" placeholder="e.g. 100">
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-trade">
+    <h2 id="h-trade">Trade</h2>
+    <div class="field">
+      <label for="symbol">Symbol</label>
+      <select id="symbol">
+        <option>USTEC</option>
+        <option>XAUUSD</option>
+        <option>JP225</option>
+        <option>USOIL</option>
+        <option>USDCAD</option>
+      </select>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="entry">Entry price</label>
+        <input id="entry" inputmode="decimal" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="sl">Stop-loss price</label>
+        <input id="sl" inputmode="decimal" autocomplete="off">
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-check">
+    <h2 id="h-check">Pre-entry checklist</h2>
+    <div class="status" id="status" role="status" aria-live="polite">
+      <span id="status-word">NOT READY</span><span class="count" id="status-count">0/5</span>
+    </div>
+    <div class="check-list">
+      <button type="button" class="check" id="c-m15m5" aria-pressed="false">
+        <span class="box" aria-hidden="true">✓</span>
+        <span><span class="code">m15m5</span><span class="desc">Trend on M15 or M5</span></span>
+      </button>
+      <button type="button" class="check" id="c-pdm5" aria-pressed="false">
+        <span class="box" aria-hidden="true">✓</span>
+        <span><span class="code">pdm5</span><span class="desc">PD M5 (price delivery)</span></span>
+      </button>
+      <button type="button" class="check" id="c-followm1" aria-pressed="false">
+        <span class="box" aria-hidden="true">✓</span>
+        <span><span class="code">followm1</span><span class="desc">Trend on M1 follows</span></span>
+      </button>
+      <button type="button" class="check" id="c-slrsm5" aria-pressed="false">
+        <span class="box" aria-hidden="true">✓</span>
+        <span><span class="code">slrsm5</span><span class="desc">SL at RSI M5 level</span></span>
+      </button>
+      <button type="button" class="check" id="c-knowrisk" aria-pressed="false">
+        <span class="box" aria-hidden="true">✓</span>
+        <span><span class="code">knowrisk</span><span class="desc">I know my lot and risk</span></span>
+      </button>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn" id="new-trade">New trade</button>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-exit">
+    <h2 id="h-exit">Exit rules</h2>
+    <div class="check-list">
+      <button type="button" class="check" id="c-tp1" aria-pressed="false">
+        <span class="box" aria-hidden="true">✓</span>
+        <span><span class="code">tp1</span><span class="desc">TP1 at Sto M1</span></span>
+      </button>
+      <button type="button" class="check" id="c-tp2" aria-pressed="false">
+        <span class="box" aria-hidden="true">✓</span>
+        <span><span class="code">tp2</span><span class="desc">TP2 trailing on M1</span></span>
+      </button>
+    </div>
+  </section>
+
+  <section class="result" aria-live="polite" aria-labelledby="h-res">
+    <div>
+      <div class="label" id="h-res">Lot size <span id="sym-tag"></span></div>
+      <div class="lot" id="lot">—</div>
+    </div>
+    <p class="note" id="msg" hidden></p>
+    <div class="stats">
+      <div class="stat"><span class="label">Direction</span><span class="v" id="dir">—</span></div>
+      <div class="stat"><span class="label">Money at risk</span><span class="v" id="risk">—</span></div>
+      <div class="stat"><span class="label">SL distance (price)</span><span class="v" id="dist">—</span></div>
+      <div class="stat"><span class="label">SL distance (points)</span><span class="v" id="pts">—</span></div>
+      <div class="stat"><span class="label">Exact lot</span><span class="v" id="rawlot">—</span></div>
+      <div class="stat"><span class="label">Target risk</span><span class="v" id="target">—</span></div>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="h-preset">
+    <div class="preset-head">
+      <h2 id="h-preset">Preset for <span id="preset-name">USTEC</span></h2>
+      <span class="saved" id="saved">Saved on this device</span>
+    </div>
+    <div class="row">
+      <div class="field" id="usd-wrap">
+        <label for="p-usd">USD per 1.0 price move, 1 lot</label>
+        <input id="p-usd" inputmode="decimal" autocomplete="off">
+      </div>
+      <div class="field" id="contract-wrap" hidden>
+        <label for="p-contract">Contract size</label>
+        <input id="p-contract" inputmode="decimal" autocomplete="off">
+        <span class="hint">USD per 1.0 move = contract size ÷ entry price</span>
+      </div>
+      <div class="field">
+        <label for="p-digits">Digits</label>
+        <input id="p-digits" inputmode="numeric" autocomplete="off">
+        <span class="hint" id="point-hint">Point size = 10<sup>−digits</sup></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="p-step">Lot step</label>
+        <input id="p-step" inputmode="decimal" autocomplete="off">
+        <span class="hint">Lot is rounded down to this</span>
+      </div>
+      <div class="field" id="auto-wrap" hidden>
+        <span class="hint">USD per 1.0 move now</span>
+        <span class="calc-out" id="auto-usd">—</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn" id="reset">Reset to Exness specs</button>
+      <span id="confirm-wrap" hidden>
+        <button type="button" class="btn danger" id="reset-yes">Yes, reset</button>
+        <button type="button" class="btn" id="reset-no">Cancel</button>
+      </span>
+    </div>
+  </section>
+
+  <footer>
+    Lot = risk USD ÷ (|entry − SL| × USD per 1.0 move), rounded down to the lot step.
+    Your numbers are kept in this browser only. Check every result before you trade.
+  </footer>
+</div>
+
+<script>
+(function () {
+  var KEY = "shin-lotcalc-v2";
+  var SYMBOLS = ["USTEC", "XAUUSD", "JP225", "USOIL", "USDCAD"];
+  var FIELDS = ["usd", "contract", "digits", "step"];
+  // From Shin's Exness spec screenshots (9 Nov 2026). Empty = not readable on the screenshot.
+  var DEFAULTS = {
+    USTEC:  { usd: "1",      contract: "",       digits: "2", step: "0.01" },
+    XAUUSD: { usd: "100",    contract: "",       digits: "3", step: "0.01" },
+    JP225:  { usd: "0.0063", contract: "",       digits: "1", step: "0.1" },
+    USOIL:  { usd: "1000",   contract: "",       digits: "3", step: "0.01" },
+    USDCAD: { usd: "",       contract: "100000", digits: "5", step: "0.01" }
+  };
+  function copy(o) { return JSON.parse(JSON.stringify(o)); }
+
+  var state = { presets: copy(DEFAULTS), mode: "pct", balance: "", riskPct: "", riskAmt: "", symbol: "USTEC", entry: "", sl: "" };
+  try {
+    var raw = localStorage.getItem(KEY);
+    if (raw) {
+      var got = JSON.parse(raw);
+      Object.keys(state).forEach(function (k) { if (k !== "presets" && got[k] != null) state[k] = String(got[k]); });
+      if (got.presets) SYMBOLS.forEach(function (s) {
+        if (got.presets[s]) FIELDS.forEach(function (f) {
+          var v = got.presets[s][f];
+          if (v == null) return;
+          if (f === "step" && String(v).trim() === "") return; // older saves had no lot step; keep the Exness one
+          state.presets[s][f] = String(v);
+        });
+      });
+    }
+  } catch (e) {}
+
+  function $(id) { return document.getElementById(id); }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); $("saved").textContent = "Saved on this device"; }
+    catch (e) { $("saved").textContent = "Can't save in this browser"; }
+  }
+  function num(v) {
+    var s = String(v == null ? "" : v).trim().replace(/,/g, "");
+    if (s === "") return NaN;
+    var n = Number(s);
+    return isFinite(n) ? n : NaN;
+  }
+  function decimals(n) {
+    var s = String(n);
+    if (s.indexOf("e-") > -1) return parseInt(s.split("e-")[1], 10);
+    var i = s.indexOf(".");
+    return i < 0 ? 0 : s.length - i - 1;
+  }
+  function fmt(n, min, max) {
+    return n.toLocaleString("en-US", { minimumFractionDigits: min, maximumFractionDigits: max == null ? min : max });
+  }
+  function usd(n) { return "$" + fmt(n, 2); }
+
+  var simple = ["balance", "riskPct", "riskAmt", "entry", "sl"];
+  simple.forEach(function (k) { $(k).value = state[k]; });
+  if (SYMBOLS.indexOf(state.symbol) < 0) state.symbol = "USTEC";
+  $("symbol").value = state.symbol;
+
+  function isAuto() { return state.symbol === "USDCAD"; }
+  function loadPreset() {
+    var p = state.presets[state.symbol];
+    $("p-usd").value = p.usd; $("p-contract").value = p.contract;
+    $("p-digits").value = p.digits; $("p-step").value = p.step;
+    $("preset-name").textContent = state.symbol;
+    $("sym-tag").textContent = "· " + state.symbol;
+    $("usd-wrap").hidden = isAuto();
+    $("contract-wrap").hidden = !isAuto();
+    $("auto-wrap").hidden = !isAuto();
+  }
+  function setMode(m) {
+    state.mode = m;
+    $("mode-pct").setAttribute("aria-pressed", String(m === "pct"));
+    $("mode-amt").setAttribute("aria-pressed", String(m === "amt"));
+    $("pct-wrap").hidden = m !== "pct";
+    $("amt-wrap").hidden = m !== "amt";
+  }
+  function show(msg) { var el = $("msg"); el.textContent = msg || ""; el.hidden = !msg; }
+
+  // Checklist: ticks live in memory only and reset with "New trade".
+  var MANUAL = ["m15m5", "pdm5", "followm1", "slrsm5", "knowrisk"];
+  var ticks = { m15m5: false, pdm5: false, followm1: false, slrsm5: false, knowrisk: false };
+  var riskOk = false;
+  // Exit rules: ticked by hand, never counted in the GO bar.
+  var EXIT = ["tp1", "tp2"];
+  var exits = { tp1: false, tp2: false };
+  EXIT.forEach(function (k) {
+    $("c-" + k).addEventListener("click", function () { exits[k] = !exits[k]; renderChecks(); });
+  });
+  function renderChecks() {
+    MANUAL.forEach(function (k) { $("c-" + k).setAttribute("aria-pressed", String(ticks[k])); });
+    EXIT.forEach(function (k) { $("c-" + k).setAttribute("aria-pressed", String(exits[k])); });
+    var n = MANUAL.filter(function (k) { return ticks[k]; }).length;
+    var go = n === 5;
+    $("status").className = "status" + (go ? " go" : "");
+    $("status-word").textContent = go ? "GO" : "NOT READY";
+    $("status-count").textContent = n + "/5";
+  }
+  MANUAL.forEach(function (k) {
+    $("c-" + k).addEventListener("click", function () { ticks[k] = !ticks[k]; renderChecks(); });
+  });
+  $("new-trade").addEventListener("click", function () {
+    MANUAL.forEach(function (k) { ticks[k] = false; });
+    EXIT.forEach(function (k) { exits[k] = false; });
+    renderChecks();
+  });
+
+  function calc() {
+    riskOk = false;
+    calcInner();
+    renderChecks();
+  }
+
+  function calcInner() {
+    ["lot", "dir", "risk", "dist", "pts", "rawlot", "target"].forEach(function (id) { $(id).textContent = "—"; });
+    $("auto-usd").textContent = "—";
+    var p = state.presets[state.symbol];
+    var digits = num(p.digits), step = num(p.step);
+    var entry = num(state.entry), sl = num(state.sl);
+
+    var target = state.mode === "pct" ? num(state.balance) * num(state.riskPct) / 100 : num(state.riskAmt);
+    if (isFinite(target)) $("target").textContent = usd(target);
+
+    var dOk = isFinite(digits) && digits >= 0 && digits % 1 === 0;
+    $("point-hint").textContent = dOk ? "Point size = " + fmt(Math.pow(10, -digits), digits) : "Point size = 10^−digits";
+
+    if (isFinite(entry) && isFinite(sl) && entry !== sl) {
+      var buy = sl < entry;
+      $("dir").innerHTML = '<span class="pill ' + (buy ? "buy" : "sell") + '">' + (buy ? "BUY" : "SELL") + "</span>";
+      var dist = Math.abs(entry - sl);
+      $("dist").textContent = dOk ? fmt(dist, digits) : fmt(dist, 0, 6);
+      if (dOk) $("pts").textContent = fmt(Math.round(dist * Math.pow(10, digits)), 0) + " pts";
+    }
+
+    var perMove;
+    if (isAuto()) {
+      var contract = num(p.contract);
+      if (!(contract > 0)) { show("Fill in contract size for USDCAD in the preset below."); return; }
+      if (!(entry > 0)) { show("Type an entry price. USDCAD's value comes from it."); return; }
+      perMove = contract / entry;
+      $("auto-usd").textContent = usd(perMove);
+    } else {
+      perMove = num(p.usd);
+      if (!(perMove > 0)) { show("Fill in USD per 1.0 price move for " + state.symbol + " in the preset below."); return; }
+    }
+    if (!isFinite(entry) || !isFinite(sl)) { show("Type an entry price and a stop-loss price."); return; }
+    if (entry === sl) { show("Entry and stop-loss are the same price."); return; }
+    if (!(target > 0)) { show(state.mode === "pct" ? "Type your balance and risk %." : "Type the risk in USD."); return; }
+
+    var perLot = Math.abs(entry - sl) * perMove;   // USD lost per 1 lot if SL is hit
+    var rawLot = target / perLot;
+    $("rawlot").textContent = fmt(rawLot, 2, 4);
+
+    var lot = rawLot, d = 2;
+    if (step > 0) {
+      d = decimals(step);
+      lot = Number((Math.floor(rawLot / step + 1e-9) * step).toFixed(d));
+      if (lot <= 0) { show("The lot is smaller than one lot step (" + p.step + "). Risk more or use a closer stop-loss."); return; }
+      show("");
+      $("lot").innerHTML = fmt(lot, d) + "<small>lots</small>";
+    } else {
+      show("No lot step for " + state.symbol + " yet, so the lot is not rounded down. Add the lot step in the preset.");
+      $("lot").innerHTML = fmt(lot, 2, 4) + "<small>lots</small>";
+    }
+    $("risk").textContent = usd(lot * perLot);
+    riskOk = lot > 0 && lot * perLot > 0;
+  }
+
+  simple.forEach(function (k) {
+    $(k).addEventListener("input", function (e) { state[k] = e.target.value; save(); calc(); });
+  });
+  $("symbol").addEventListener("change", function (e) { state.symbol = e.target.value; loadPreset(); save(); calc(); });
+  [["p-usd", "usd"], ["p-contract", "contract"], ["p-digits", "digits"], ["p-step", "step"]].forEach(function (pair) {
+    $(pair[0]).addEventListener("input", function (e) { state.presets[state.symbol][pair[1]] = e.target.value; save(); calc(); });
+  });
+  $("mode-pct").addEventListener("click", function () { setMode("pct"); save(); calc(); });
+  $("mode-amt").addEventListener("click", function () { setMode("amt"); save(); calc(); });
+  function confirmMode(on) { $("confirm-wrap").hidden = !on; $("reset").hidden = on; }
+  $("reset").addEventListener("click", function () { confirmMode(true); });
+  $("reset-no").addEventListener("click", function () { confirmMode(false); });
+  $("reset-yes").addEventListener("click", function () {
+    state.presets[state.symbol] = copy(DEFAULTS[state.symbol]);
+    loadPreset(); save(); calc(); confirmMode(false);
+  });
+
+  setMode(state.mode === "amt" ? "amt" : "pct");
+  loadPreset();
+  calc();
+})();
+</script>
